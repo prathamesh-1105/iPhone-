@@ -324,12 +324,17 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
             id: newEntry.id,
             group_id: group.id,
             partner_role: role,
+            user_name: partnerName,
             amount,
             date: dateStr,
             note: newEntry.note,
           },
         ]);
-        if (error) console.warn('Supabase entry write warning:', error.message);
+        if (error) {
+          console.warn('Supabase entry write error:', error.message);
+        } else {
+          console.log('Successfully synced entry to Supabase cloud!');
+        }
       } catch (err) {
         console.warn('Supabase exception:', err);
       }
