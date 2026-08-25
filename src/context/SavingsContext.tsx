@@ -128,11 +128,11 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   const [entries, setEntries] = useState<SavingsEntry[]>(() => {
+    if (isSupabaseConfigured()) return [];
     const saved = localStorage.getItem('iphone_fund_entries');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { console.error(e); }
     }
-    // Start cleanly from scratch (0 fake entries)
     return [];
   });
 
@@ -146,8 +146,10 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [group]);
 
   useEffect(() => {
-    localStorage.setItem('iphone_fund_entries', JSON.stringify(entries));
-  }, [entries]);
+    if (!isSupabaseConfigured() || isDemoMode) {
+      localStorage.setItem('iphone_fund_entries', JSON.stringify(entries));
+    }
+  }, [entries, isDemoMode]);
 
   // Load from Supabase if configured and not demo mode
   useEffect(() => {
