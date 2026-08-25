@@ -250,41 +250,7 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!isSupabaseConfigured() || !supabase) return;
     setIsLoading(true);
     try {
-      // 1. Fetch current cloud entries
-      const { data: dbData } = await supabase
-        .from('savings_entries')
-        .select('*')
-        .order('date', { ascending: false });
-
-      const dbIds = new Set((dbData || []).map((e) => e.id));
-
-      // 2. Upload any local entries on this device that are missing in Supabase Cloud
-      const savedLocalStr = localStorage.getItem('iphone_fund_entries');
-      if (savedLocalStr) {
-        try {
-          const localEntries: SavingsEntry[] = JSON.parse(savedLocalStr);
-          const unsynced = localEntries.filter((le) => !dbIds.has(le.id));
-
-          if (unsynced.length > 0) {
-            console.log(`Syncing ${unsynced.length} local entries to Supabase Cloud...`);
-            const toInsert = unsynced.map((le) => ({
-              id: le.id,
-              group_id: 'group-default-1',
-              partner_role: le.partnerRole,
-              user_name: le.userName,
-              amount: le.amount,
-              date: le.date,
-              note: le.note || 'Added money',
-            }));
-
-            await supabase.from('savings_entries').insert(toInsert);
-          }
-        } catch (e) {
-          console.error('Error parsing local storage during sync:', e);
-        }
-      }
-
-      // 3. Re-fetch full updated entries list from Supabase Cloud
+      // Fetch full updated entries list directly from Supabase Cloud
       const { data: finalEntriesData } = await supabase
         .from('savings_entries')
         .select('*')
@@ -304,7 +270,8 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
           updatedAt: e.updated_at || new Date().toISOString(),
         }));
         setEntries(mapped);
-        setLastAddedNotification('Cloud database successfully synchronized across all devices!');
+        localStorage.setItem('iphone_fund_entries', JSON.stringify(mapped));
+        setLastAddedNotification('Cloud database synchronized!');
       }
     } catch (err) {
       console.warn('Refresh cloud data error:', err);
@@ -415,12 +382,21 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteEntry = async (entryId: string): Promise<{ success: boolean; error?: string }> => {
-    setEntries((prev) => prev.filter((e) => e.id !== entryId));
+    setEntries((prev) => {
+      const updated = prev.filter((e) => e.id !== entryId);
+      localStorage.setItem('iphone_fund_entries', JSON.stringify(updated));
+      return updated;
+    });
 
-    if (isSupabaseConfigured() && supabase && !isDemoMode) {
-      await supabase.from('savings_entries').delete().eq('id', entryId);
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.from('savings_entries').delete().eq('id', entryId);
+      } catch (err) {
+        console.warn('Supabase delete error:', err);
+      }
     }
 
+    setLastAddedNotification('Record deleted.');
     return { success: true };
   };
 
