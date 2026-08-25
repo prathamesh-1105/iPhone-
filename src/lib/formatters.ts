@@ -13,6 +13,8 @@ export function formatINR(amount: number | null | undefined): string {
   return `₹${formattedNumber}`;
 }
 
+export const formatCurrency = formatINR;
+
 /**
  * Returns today's date in YYYY-MM-DD string format (local time).
  */

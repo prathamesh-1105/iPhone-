@@ -210,6 +210,17 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     loadSupabaseData();
 
+    // Heartbeat Keep-Alive ping to keep Supabase awake
+    const keepAliveInterval = setInterval(async () => {
+      if (isSupabaseConfigured() && supabase && !isDemoMode) {
+        try {
+          await supabase.from('savings_entries').select('id').limit(1);
+        } catch {
+          // Ignore ping errors
+        }
+      }
+    }, 4 * 60 * 1000); // Every 4 minutes
+
     // Supabase Realtime Subscription setup
     if (isSupabaseConfigured() && supabase && !isDemoMode) {
       const client = supabase;
@@ -225,9 +236,14 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .subscribe();
 
       return () => {
+        clearInterval(keepAliveInterval);
         client.removeChannel(channel);
       };
     }
+
+    return () => {
+      clearInterval(keepAliveInterval);
+    };
   }, [isDemoMode]);
 
   // Derived Analytics Data
@@ -281,64 +297,47 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const partnerName = role === 'partner1' ? group.partner1Name : group.partner2Name;
 
-    // Local / Demo update first for instant UI response
-    const existingIndex = entries.findIndex(
-      (e) => e.date === dateStr && e.partnerRole === role
+    const newEntry: SavingsEntry = {
+      id: `entry-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      groupId: group.id,
+      userId: role === 'partner1' ? 'user-p1' : 'user-p2',
+      partnerRole: role,
+      userName: partnerName,
+      amount,
+      date: dateStr,
+      note: note || 'Added money',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedEntries = [newEntry, ...entries].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-
-    let updatedEntries = [...entries];
-    if (existingIndex >= 0) {
-      // Update existing entry
-      updatedEntries[existingIndex] = {
-        ...updatedEntries[existingIndex],
-        amount,
-        note: note !== undefined ? note : updatedEntries[existingIndex].note,
-        updatedAt: new Date().toISOString(),
-      };
-    } else {
-      // Add new entry
-      const newEntry: SavingsEntry = {
-        id: `entry-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        groupId: group.id,
-        userId: role === 'partner1' ? 'user-p1' : 'user-p2',
-        partnerRole: role,
-        userName: partnerName,
-        amount,
-        date: dateStr,
-        note: note || 'Daily check-in',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      updatedEntries = [newEntry, ...updatedEntries];
-    }
-
-    // Sort entries descending by date
-    updatedEntries.sort((a, b) => b.date.localeCompare(a.date));
     setEntries(updatedEntries);
 
     // Supabase DB persist if connected
     if (isSupabaseConfigured() && supabase && !isDemoMode) {
       try {
         const client = supabase;
-        const { error } = await client.from('savings_entries').upsert(
+        const { error } = await client.from('savings_entries').insert([
           {
+            id: newEntry.id,
             group_id: group.id,
             partner_role: role,
             amount,
             date: dateStr,
-            note,
+            note: newEntry.note,
           },
-          { onConflict: 'group_id,user_id,date' }
-        );
-        if (error) console.error('Supabase entry write error:', error);
+        ]);
+        if (error) console.warn('Supabase entry write warning:', error.message);
       } catch (err) {
-        console.error('Supabase exception:', err);
+        console.warn('Supabase exception:', err);
       }
     }
 
     // Trigger celebration & notification
     triggerConfetti();
-    setLastAddedNotification(`₹${amount} added for ${partnerName}! You're getting closer. ❤️`);
+    setLastAddedNotification(`₹${amount.toLocaleString()} added for ${partnerName}!`);
 
     return { success: true };
   };
