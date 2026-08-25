@@ -15,11 +15,12 @@ import {
   X,
   TrendingUp,
   History,
-  UserCheck
+  UserCheck,
+  RefreshCw
 } from 'lucide-react';
 
 const MoneyTrackerMain: React.FC = () => {
-  const { group, entries, addOrUpdateEntry, deleteEntry, updateGroupConfig, lastAddedNotification, clearNotification } = useSavings();
+  const { group, entries, addOrUpdateEntry, deleteEntry, updateGroupConfig, refreshCloudData, isLoading, lastAddedNotification, clearNotification } = useSavings();
   const { activeRole, switchActiveRole } = useAuth();
 
   // Form State for Adding Money
@@ -112,16 +113,17 @@ const MoneyTrackerMain: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Supabase Status Indicator (Mobile & Desktop) */}
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-full text-[11px] sm:text-xs text-gray-600 font-medium"
-              title="Connected to Supabase Cloud Database"
+            <button
+              onClick={refreshCloudData}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full text-[11px] sm:text-xs text-emerald-800 font-semibold transition active:scale-95"
+              title="Click to sync latest data from Supabase Cloud"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <Database className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-500" />
-              <span className="hidden xs:inline">Synced</span>
-            </div>
+              <RefreshCw className={`w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-700 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Sync Cloud</span>
+            </button>
 
             {/* Edit Goal Button */}
             <button

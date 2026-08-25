@@ -32,6 +32,7 @@ interface SavingsContextType {
   updateGroupConfig: (updates: Partial<SavingsGroup>) => Promise<{ success: boolean; error?: string }>;
   resetToFreshSlate: () => void;
   seedDemoData: () => void;
+  refreshCloudData: () => Promise<void>;
   lastAddedNotification: string | null;
   clearNotification: () => void;
 }
@@ -195,41 +196,9 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
           amount: Number(e.amount),
           date: e.date,
           note: e.note,
-          createdAt: e.created_at,
-          updatedAt: e.updated_at,
+          createdAt: e.created_at || new Date().toISOString(),
+          updatedAt: e.updated_at || new Date().toISOString(),
         })) : [];
-
-        // Check if there are local offline entries stored in LocalStorage that haven't been uploaded to Supabase yet
-        const savedLocalStr = localStorage.getItem('iphone_fund_entries');
-        if (savedLocalStr) {
-          try {
-            const localEntries: SavingsEntry[] = JSON.parse(savedLocalStr);
-            const existingIds = new Set(mapped.map((e) => e.id));
-            const missingInSupabase = localEntries.filter((le) => !existingIds.has(le.id));
-
-            if (missingInSupabase.length > 0) {
-              console.log(`Found ${missingInSupabase.length} local entries not in Supabase. Uploading now...`);
-              const toInsert = missingInSupabase.map((le) => ({
-                id: le.id,
-                group_id: groupData?.id || 'group-default-1',
-                partner_role: le.partnerRole,
-                user_name: le.userName,
-                amount: le.amount,
-                date: le.date,
-                note: le.note,
-              }));
-
-              const { error: syncError } = await supabase.from('savings_entries').insert(toInsert);
-              if (!syncError) {
-                mapped.push(...missingInSupabase);
-                mapped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-                console.log('Local entries successfully synced to Supabase cloud!');
-              }
-            }
-          } catch (e) {
-            console.error('Error auto-syncing local entries:', e);
-          }
-        }
 
         setEntries(mapped);
       } catch (err) {
@@ -276,6 +245,37 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
       clearInterval(keepAliveInterval);
     };
   }, [isDemoMode]);
+
+  const refreshCloudData = async () => {
+    if (!isSupabaseConfigured() || !supabase || isDemoMode) return;
+    setIsLoading(true);
+    try {
+      const { data: entriesData } = await supabase
+        .from('savings_entries')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (entriesData) {
+        const mapped: SavingsEntry[] = entriesData.map((e) => ({
+          id: e.id,
+          groupId: e.group_id,
+          userId: e.user_id,
+          partnerRole: e.partner_role,
+          userName: e.user_name || (e.partner_role === 'partner1' ? group.partner1Name : group.partner2Name),
+          amount: Number(e.amount),
+          date: e.date,
+          note: e.note,
+          createdAt: e.created_at || new Date().toISOString(),
+          updatedAt: e.updated_at || new Date().toISOString(),
+        }));
+        setEntries(mapped);
+      }
+    } catch (err) {
+      console.warn('Refresh cloud data error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Derived Analytics Data
   const streakStats = useMemo(
@@ -438,6 +438,7 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateGroupConfig,
         resetToFreshSlate,
         seedDemoData,
+        refreshCloudData,
         lastAddedNotification,
         clearNotification,
       }}
