@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 const MoneyTrackerMain: React.FC = () => {
-  const { group, entries, addOrUpdateEntry, deleteEntry, updateGroupConfig, refreshCloudData, isLoading, lastAddedNotification, clearNotification } = useSavings();
+  const { group, entries, addOrUpdateEntry, deleteEntry, updateGroupConfig, refreshCloudData, resetToFreshSlate, isLoading, lastAddedNotification, clearNotification } = useSavings();
   const { activeRole, switchActiveRole } = useAuth();
 
   // Form State for Adding Money
@@ -513,6 +513,21 @@ const MoneyTrackerMain: React.FC = () => {
                   className="flex-1 py-2 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-lg transition"
                 >
                   Save Changes
+                </button>
+              </div>
+
+              <div className="border-t border-gray-100 pt-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to clear all money records and start fresh at ₹0?')) {
+                      resetToFreshSlate();
+                      setIsEditGoalOpen(false);
+                    }
+                  }}
+                  className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg border border-red-200 transition"
+                >
+                  Clear All Money Records (Reset to 0)
                 </button>
               </div>
             </form>

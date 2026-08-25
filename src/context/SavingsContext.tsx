@@ -423,9 +423,17 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return { success: true };
   };
 
-  const resetToFreshSlate = () => {
+  const resetToFreshSlate = async () => {
     setEntries([]);
     localStorage.removeItem('iphone_fund_entries');
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.from('savings_entries').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      } catch (err) {
+        console.warn('Wipe DB error:', err);
+      }
+    }
+    setLastAddedNotification('All money records cleared! Ready for fresh entries.');
   };
 
   const seedDemoData = () => {
