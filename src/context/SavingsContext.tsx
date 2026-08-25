@@ -247,16 +247,51 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [isDemoMode]);
 
   const refreshCloudData = async () => {
-    if (!isSupabaseConfigured() || !supabase || isDemoMode) return;
+    if (!isSupabaseConfigured() || !supabase) return;
     setIsLoading(true);
     try {
-      const { data: entriesData } = await supabase
+      // 1. Fetch current cloud entries
+      const { data: dbData } = await supabase
         .from('savings_entries')
         .select('*')
         .order('date', { ascending: false });
 
-      if (entriesData) {
-        const mapped: SavingsEntry[] = entriesData.map((e) => ({
+      const dbIds = new Set((dbData || []).map((e) => e.id));
+
+      // 2. Upload any local entries on this device that are missing in Supabase Cloud
+      const savedLocalStr = localStorage.getItem('iphone_fund_entries');
+      if (savedLocalStr) {
+        try {
+          const localEntries: SavingsEntry[] = JSON.parse(savedLocalStr);
+          const unsynced = localEntries.filter((le) => !dbIds.has(le.id));
+
+          if (unsynced.length > 0) {
+            console.log(`Syncing ${unsynced.length} local entries to Supabase Cloud...`);
+            const toInsert = unsynced.map((le) => ({
+              id: le.id,
+              group_id: 'group-default-1',
+              partner_role: le.partnerRole,
+              user_name: le.userName,
+              amount: le.amount,
+              date: le.date,
+              note: le.note || 'Added money',
+            }));
+
+            await supabase.from('savings_entries').insert(toInsert);
+          }
+        } catch (e) {
+          console.error('Error parsing local storage during sync:', e);
+        }
+      }
+
+      // 3. Re-fetch full updated entries list from Supabase Cloud
+      const { data: finalEntriesData } = await supabase
+        .from('savings_entries')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (finalEntriesData) {
+        const mapped: SavingsEntry[] = finalEntriesData.map((e) => ({
           id: e.id,
           groupId: e.group_id,
           userId: e.user_id,
@@ -269,6 +304,7 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
           updatedAt: e.updated_at || new Date().toISOString(),
         }));
         setEntries(mapped);
+        setLastAddedNotification('Cloud database successfully synchronized across all devices!');
       }
     } catch (err) {
       console.warn('Refresh cloud data error:', err);
