@@ -321,7 +321,7 @@ const MoneyTrackerMain: React.FC = () => {
               className="w-full h-12 sm:h-11 bg-gray-900 hover:bg-gray-800 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-lg shadow-sm transition flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Money Now</span>
+              <span>{isSubmitting ? 'Saving to Cloud...' : 'Save & Sync Money to Cloud'}</span>
             </button>
           </form>
         </section>

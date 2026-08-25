@@ -352,13 +352,13 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setEntries(updatedEntries);
 
     // Supabase DB persist if connected
-    if (isSupabaseConfigured() && supabase && !isDemoMode) {
+    if (isSupabaseConfigured() && supabase) {
       try {
         const client = supabase;
         const { error } = await client.from('savings_entries').insert([
           {
             id: newEntry.id,
-            group_id: group.id,
+            group_id: 'group-default-1',
             partner_role: role,
             user_name: partnerName,
             amount,
@@ -370,6 +370,7 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
           console.warn('Supabase entry write error:', error.message);
         } else {
           console.log('Successfully synced entry to Supabase cloud!');
+          await refreshCloudData();
         }
       } catch (err) {
         console.warn('Supabase exception:', err);
@@ -393,6 +394,7 @@ export const SavingsProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (isSupabaseConfigured() && supabase) {
       try {
         await supabase.from('savings_entries').delete().eq('id', entryId);
+        await refreshCloudData();
       } catch (err) {
         console.warn('Supabase delete error:', err);
       }
